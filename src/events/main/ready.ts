@@ -12,6 +12,7 @@ export default new Event({
     figlet({
       text: 'PulseBot',
       font: 'Big',
+      spaces: true,
     });
 
     console.log(` ⬤ Comandos carregados: ${commands.size}`.grey);

@@ -26,8 +26,19 @@ import { EventType } from "../types/event";
 
 dotenv.config();
 
-const isJavascriptOrTypescriptFile = (file: string) =>
-  file.endsWith(".ts") || file.endsWith(".js");
+type CommandOrEvent = "commands" | "events";
+
+interface GetModuleParams {
+  fileName: string;
+  local: string;
+  type: CommandOrEvent;
+}
+
+type ModuleType<T> = T extends "commands"
+  ? CommandType
+  : T extends "events"
+  ? EventType<keyof ClientEvents>
+  : never;
 
 export class SuperClient extends Client {
   public commands = new Collection<string, CommandType>();
@@ -72,42 +83,30 @@ export class SuperClient extends Client {
   }
 
   private async registerModules() {
-    console.log('⌛ Carregando comandos...'.yellow);
+    console.log("⌛ Carregando comandos...".yellow);
 
     const slashCommands: ApplicationCommandDataResolvable[] = [];
 
-    const commandsPath = path.join(__dirname, "..", "commands");
+    this.loadPaths<"commands">("commands", async (command) => {
+      const { name, buttons, selects, modals } = command;
 
-    const paths = fs.readdirSync(commandsPath);
+      if (name) {
+        this.commands.set(name, command);
+        slashCommands.push(command);
 
-    for (const local of paths) {
-      const subPaths = fs
-        .readdirSync(`${commandsPath}/${local}/`)
-        .filter(isJavascriptOrTypescriptFile);
+        if (buttons) {
+          buttons.forEach((button, key) => this.buttons.set(key, button));
+        }
 
-      for (const fileName of subPaths) {
-        const command = await this.getCommand(local, fileName);
+        if (selects) {
+          selects.forEach((select, key) => this.selects.set(key, select));
+        }
 
-        const { name, buttons, selects, modals } = command;
-
-        if (name) {
-          this.commands.set(name, command);
-          slashCommands.push(command);
-
-          if (buttons) {
-            buttons.forEach((button, key) => this.buttons.set(key, button));
-          }
-
-          if (selects) {
-            selects.forEach((select, key) => this.selects.set(key, select));
-          }
-
-          if (modals) {
-            modals.forEach((modal, key) => this.modals.set(key, modal));
-          }
+        if (modals) {
+          modals.forEach((modal, key) => this.modals.set(key, modal));
         }
       }
-    }
+    });
 
     this.on("ready", () => {
       this.registerCommands(slashCommands);
@@ -115,42 +114,54 @@ export class SuperClient extends Client {
   }
 
   private async registerEvents() {
-    console.log('⌛ Carregando eventos...'.yellow);
+    console.log("⌛ Carregando eventos...".yellow);
 
-    const eventsPath = path.join(__dirname, "..", "events");
+    this.loadPaths<"events">("events", async ({ name, once, run }) => {
+      try {
+        if (name) {
+          once ? this.once(name, run) : this.on(name, run);
+        }
+      } catch (error) {
+        console.log(
+          `❌  Erro ocorreu no evento: ${name}.\nError: ${error}`.red
+        );
+      }
+    });
+  }
 
-    const paths = fs.readdirSync(eventsPath);
+  private async loadPaths<T extends CommandOrEvent>(
+    name: "events" | "commands",
+    run: (module: ModuleType<T>) => void
+  ) {
+    const isJavascriptOrTypescriptFile = (file: string) =>
+      file.endsWith(".ts") || file.endsWith(".js");
+
+    const toPath = path.join(__dirname, "..", name);
+
+    const paths = fs.readdirSync(toPath);
 
     for (const local of paths) {
       const subPaths = fs
-        .readdirSync(`${eventsPath}/${local}/`)
+        .readdirSync(`${toPath}/${local}/`)
         .filter(isJavascriptOrTypescriptFile);
 
       for (const fileName of subPaths) {
-        const { name, once, run } = await this.getEvent(local, fileName);
+        const module = await this.getModule<T>({ fileName, local, type: name });
 
-        try {
-          if (name) {
-            once ? this.once(name, run) : this.on(name, run);
-          }
-        } catch (error) {
-          console.log(
-            `❌  Erro ocorreu no evento: ${name}.\nError: ${error}`.red
-          );
-        }
+        run(module);
       }
     }
   }
 
-  private async getCommand(local: string, fileName: string) {
-    const command = await import(`../commands/${local}/${fileName}`);
+  private async getModule<T extends CommandOrEvent>({
+    fileName,
+    local,
+    type,
+  }: GetModuleParams) {
+    const toPath = `../${type}/${local}/${fileName}`;
 
-    return command.default as CommandType;
-  }
+    const module = await import(toPath);
 
-  private async getEvent(local: string, fileName: string) {
-    const command = await import(`../events/${local}/${fileName}`);
-
-    return command.default as EventType<keyof ClientEvents>;
+    return module.default as ModuleType<T>;
   }
 }
