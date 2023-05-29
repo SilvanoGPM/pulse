@@ -1,5 +1,6 @@
 import { Event } from "../../types/event";
 import { client } from "../../main";
+import { figlet } from '../../services/figlet';
 
 export default new Event({
   name: "ready",
@@ -8,9 +9,10 @@ export default new Event({
   run() {
     const { commands, buttons, selects, modals } = client;
 
-    console.log();
-    console.log(`⚡O BOT está online.`.green);
-    console.log();
+    figlet({
+      text: 'PulseBot',
+      font: 'Big',
+    });
 
     console.log(` ⬤ Comandos carregados: ${commands.size}`.grey);
     console.log(` ⬤ Botões carregados: ${buttons.size}`.grey);
