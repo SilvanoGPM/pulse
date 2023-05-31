@@ -10,7 +10,7 @@ export default new Event({
     const { commands, buttons, selects, modals } = client;
 
     figlet({
-      text: 'PulseBot',
+      text: process.env.NAME,
       font: 'Big',
       spaces: true,
     });
