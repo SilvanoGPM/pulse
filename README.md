@@ -6,6 +6,12 @@
 
 <p align="center">Handler de comandos desenvolvido em TypeScript para facilitar a criação e gerenciamento de comandos no Discord.</p>
 
+## Tecnologias :rocket:
+
+- Discord.js
+- TypeScript
+- Figlet
+
 ## Como utilizar :wrench:
 
 ### Criando aplicação do Discord 🖥️:
